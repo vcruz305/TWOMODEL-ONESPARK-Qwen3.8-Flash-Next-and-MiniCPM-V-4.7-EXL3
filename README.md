@@ -1,4 +1,4 @@
-# TWOMODEL-ONESPARK: Qwen3.8-Flash-Next + MiniCPM-V 4.7 on one DGX Spark
+# TWOMODELS-ONESPARK: Qwen3.8-Flash-Next + MiniCPM-V 4.7 on one DGX Spark
 
 Run **Qwen3.8-Flash-Next EXL3 3.05 bpw** as a main agent and **MiniCPM-V 4.7 35B-A3B SAGE EXL3 3.74 bpw**
 as its subagents on **one** DGX Spark, both at full **262,144-token** context, through
@@ -37,8 +37,8 @@ which both track the **latest** `vcruz305/exllamav3` master and `vcruz305/tabbyA
 On the Spark, with CUDA 13 (`/usr/local/cuda-13.0`) and a CUDA PyTorch environment:
 
 ```bash
-git clone https://github.com/vcruz305/TWOMODEL-ONESPARK-Qwen3.8-Flash-Next-and-MiniCPM-V-4.7-EXL3.git
-cd TWOMODEL-ONESPARK-Qwen3.8-Flash-Next-and-MiniCPM-V-4.7-EXL3
+git clone https://github.com/vcruz305/TWOMODELS-ONESPARK-Qwen3.8-Flash-Next-and-MiniCPM-V-4.7-EXL3.git
+cd TWOMODELS-ONESPARK-Qwen3.8-Flash-Next-and-MiniCPM-V-4.7-EXL3
 
 BASE_PYTHON=/path/to/cuda-venv/bin/python bash bin/setup.sh   # both runtimes, latest fork commits (~8 min)
 bash bin/download.sh                                           # ~81 GB Qwen + ~18 GB MiniCPM
