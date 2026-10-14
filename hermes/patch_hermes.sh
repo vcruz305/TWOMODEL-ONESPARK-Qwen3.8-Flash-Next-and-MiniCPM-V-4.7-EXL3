@@ -11,12 +11,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 P="$ROOT/hermes/patches/delegate-schema-retry-keeps-history.patch"
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+# Find the Hermes install. The official installer puts the `hermes` launcher in ~/.local/bin but only adds
+# that to PATH for interactive shells, so also look there (and honour HERMES_BIN / HERMES_SRC).
 src="${HERMES_SRC:-}"
 if [[ -z "$src" ]]; then
-  ver="$(hermes --version 2>/dev/null || true)"
-  src="$(printf '%s\n' "$ver" | sed -n 's/^Install directory: //p' | head -1)"
+  for cand in "${HERMES_BIN:-}" "$(command -v hermes 2>/dev/null || true)" "$HOME/.local/bin/hermes"; do
+    [[ -n "$cand" && -x "$cand" ]] || continue
+    src="$("$cand" --version 2>/dev/null | sed -n 's/^Install directory: //p' | head -1 || true)"
+    [[ -n "$src" ]] && break
+  done
 fi
-[[ -n "$src" && -f "$src/tools/delegate_tool_child_run.py" ]] || die "Hermes source not found; set HERMES_SRC to your hermes-agent checkout"
+if [[ -z "$src" && -f "$HOME/.hermes/hermes-agent/tools/delegate_tool_child_run.py" ]]; then src="$HOME/.hermes/hermes-agent"; fi
+[[ -n "$src" && -f "$src/tools/delegate_tool_child_run.py" ]] || die "Hermes source not found; set HERMES_SRC to your hermes-agent checkout (the directory 'hermes --version' lists as Install directory)"
+echo "Hermes source: $src"
 f="$src/tools/delegate_tool_child_run.py"
 if grep -q "conversation_history=_history" "$f"; then echo "Hermes at $src already has the schema-retry fix; nothing to do."; exit 0; fi
 if ! grep -q "user_message=build_retry_message(_schema_errors), task_id=child_task_id," "$f"; then

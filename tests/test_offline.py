@@ -176,6 +176,47 @@ class FanoutScorer(unittest.TestCase):
         for text, fname, want in cases:
             self.assertEqual(f(text, fname), want, text[:60])
 
+class PatchHermes(unittest.TestCase):
+    """patch_hermes.sh must find Hermes when `hermes` is NOT on PATH (non-interactive shells), apply the fix
+    once, and be a no-op on re-run."""
+    def test_finds_launcher_off_path_and_is_idempotent(self):
+        import tempfile, shutil
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); src = h / "hermes-agent"; (src / "tools").mkdir(parents=True); (src / "tests/tools").mkdir(parents=True)
+            patch = (ROOT / "hermes/patches/delegate-schema-retry-keeps-history.patch").read_text()
+            # Reconstruct the pre-patch files the patch applies to from its own context (-/space lines).
+            files = {}
+            for block in patch.split("diff --git ")[1:]:
+                path = block.split(" b/", 1)[1].split("\n", 1)[0]
+                files[path] = block
+            subprocess.run(["git", "init", "-q", str(src)], check=True)
+            ok = self._materialize(src, patch)
+            if not ok: self.skipTest("could not rebuild pre-patch sources from the patch context")
+            launcher = h / ".local/bin/hermes"; launcher.parent.mkdir(parents=True)
+            launcher.write_text(f"#!/bin/sh\necho 'Hermes Agent vtest'\necho 'Install directory: {src}'\n"); launcher.chmod(0o755)
+            env = {"HOME": str(h), "PATH": "/usr/bin:/bin"}   # no ~/.local/bin on PATH, no hermes
+            r1 = subprocess.run(["bash", str(ROOT / "hermes/patch_hermes.sh")], capture_output=True, text=True, env=env)
+            self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr); self.assertIn("Applied", r1.stdout)
+            self.assertIn("conversation_history=_history", (src / "tools/delegate_tool_child_run.py").read_text())
+            r2 = subprocess.run(["bash", str(ROOT / "hermes/patch_hermes.sh")], capture_output=True, text=True, env=env)
+            self.assertEqual(r2.returncode, 0, r2.stderr); self.assertIn("already has the schema-retry fix", r2.stdout)
+    def _materialize(self, src, patch):
+        """Write each patched file's pre-image as only its hunk context, which `git apply` accepts when the
+        hunks are rebuilt with matching line numbers. Simpler: use --recount on a file holding exactly the
+        hunks' old lines."""
+        import re
+        for block in patch.split("diff --git ")[1:]:
+            path = block.split(" b/", 1)[1].split("\n", 1)[0]
+            old_lines = []
+            for line in block.split("\n"):
+                if line.startswith(("---", "+++", "index ", "@@")) or line.startswith("a/"): continue
+                if line.startswith("-") or line.startswith(" "): old_lines.append(line[1:])
+            (src / path).parent.mkdir(parents=True, exist_ok=True)
+            (src / path).write_text("\n".join(old_lines) + "\n")
+        subprocess.run(["git", "-C", str(src), "add", "-A"], check=True)
+        chk = subprocess.run(["git", "-C", str(src), "apply", "--check", "--recount", "-"], input=patch, text=True, capture_output=True)
+        return chk.returncode == 0
+
 class Hermes(unittest.TestCase):
     def cfg(self):
         import yaml
