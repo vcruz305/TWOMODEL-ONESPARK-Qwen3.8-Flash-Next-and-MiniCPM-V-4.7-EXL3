@@ -40,7 +40,8 @@ class Shell(unittest.TestCase):
             if f.is_file() and f.name != "test_offline.py" and ".git" not in f.parts and f.suffix in (".sh", ".py", ".md", ".yaml", ".json"):
                 t = f.read_text(errors="ignore")
                 self.assertNotRegex(t, r"\b[0-9a-f]{64}\b(?!.*commit)" if f.suffix != ".json" else r"api_key\"\s*:\s*\"[0-9a-f]{32,}", f)
-                self.assertNotIn("/home/cruzspark", t, f); self.assertNotIn("sage-campaigns", t, f)
+                for bad in ("/home/cruzspark", "sage-campaigns", "192.168.", "spark-gb10", "spark-724a", "W:/", "REXL3"):
+                    self.assertNotIn(bad, t, f"{f}: {bad}")
 
 class Lifecycle(unittest.TestCase):
     """Run the real bin/up.sh, status.sh, run_all.sh preflight and down.sh against stub servers that take a
@@ -78,6 +79,61 @@ class Lifecycle(unittest.TestCase):
             ra = run(str(ROOT / "tests/run_all.sh"), "tools")
             self.assertNotEqual(ra.returncode, 0); self.assertRegex(ra.stderr, "no MiniCPM key|servers not ready")
 
+class Robustness(unittest.TestCase):
+    """Failure paths found in review: no orphaned servers, floor checked before Qwen, PID reuse."""
+    def _setup(self, h, qwen_cmd=None, mini_delay=2):
+        import socket
+        def free_port():
+            s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
+        qp, mp = free_port(), free_port()
+        for name, port, key, cmd in (("qwen", qp, "", qwen_cmd),
+                                     ("minicpm", mp, f"{h}/minicpm-state/api_tokens.yml", None)):
+            d = h / f"{name}-recipe/exllamav3-tabby"; d.mkdir(parents=True)
+            (d / "serve.sh").write_text(cmd or f"exec python3 {ROOT/'tests/stub_server.py'} {port} {mini_delay} {key}\n")
+            m = h / f"{name}-model"; m.mkdir(); (m / "config.json").write_text("{}")
+        env = {**os.environ, "TWOMODEL_HOME": str(h), "QWEN_PORT": str(qp), "MINI_PORT": str(mp),
+               "QWEN_MODEL_DIR": str(h / "qwen-model"), "MINI_MODEL_DIR": str(h / "minicpm-model"),
+               "MEM_FLOOR_MIB": "1", "QWEN_NEED_MIB": "1"}
+        return env, qp, mp
+    def _run(self, env, *a):
+        return subprocess.run(["bash", *a], capture_output=True, text=True, env=env, timeout=120)
+    def _listening(self, port):
+        import socket
+        with socket.socket() as s:
+            return s.connect_ex(("127.0.0.1", port)) == 0
+    def test_failed_qwen_start_stops_minicpm(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); env, qp, mp = self._setup(h, qwen_cmd="sleep 1; echo boom >&2; exit 3\n")
+            up = self._run(env, str(ROOT / "bin/up.sh"))
+            self.assertNotEqual(up.returncode, 0); self.assertIn("stopping servers started by this run", up.stderr)
+            self.assertFalse(self._listening(mp), "MiniCPM left running after Qwen failed")
+    def test_floor_checked_before_qwen_load(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); env, qp, mp = self._setup(h)
+            env["QWEN_NEED_MIB"] = str(10**9)     # pretend Qwen needs more than any machine has
+            up = self._run(env, str(ROOT / "bin/up.sh"))
+            self.assertNotEqual(up.returncode, 0); self.assertIn("Qwen needs", up.stderr)
+            self.assertFalse((h / "logs/qwen.log").exists(), "Qwen was started despite the floor check")
+            self.assertFalse(self._listening(mp))
+    def test_down_ignores_reused_pid(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); env, *_ = self._setup(h); (h / "logs").mkdir()
+            victim = subprocess.Popen(["sleep", "60"])
+            ours = subprocess.Popen(["sleep", "60"])
+            try:
+                # A bare PID (no start-time proof) and a wrong start time both mean "not ours".
+                (h / "logs/qwen.pid").write_text(f"{victim.pid}\n")
+                start = open(f"/proc/{ours.pid}/stat").read().split()[21]
+                (h / "logs/minicpm.pid").write_text(f"{ours.pid} {start}\n")
+                self._run(env, str(ROOT / "bin/down.sh"))
+                self.assertIsNone(victim.poll(), "down.sh signalled a process it did not start")
+                ours.wait(timeout=10)   # the correctly recorded process is still stopped
+            finally:
+                victim.kill(); ours.kill()
+
 class Hermes(unittest.TestCase):
     def cfg(self):
         import yaml
@@ -94,6 +150,8 @@ class Hermes(unittest.TestCase):
         c = self.cfg(); batch, _, cache, *_ = env_defaults()
         ctx = c["providers"]["minicpm-spark"]["models"]["MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw"]["context_length"]
         self.assertLessEqual(ctx * int(batch), int(cache))
+    def test_worktree_isolation_on(self):
+        self.assertIs(self.cfg()["delegation"]["worktree_isolation"], True)
     def test_titles_avoid_qwen_template(self):
         self.assertEqual(self.cfg()["auxiliary"]["title_generation"]["provider"], "minicpm-spark")
     def test_fanout_fails_on_wrong_answer(self):

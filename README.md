@@ -64,7 +64,9 @@ can be re-run any time to pick up new fork commits; it never touches running ser
   costs ~30 GB that the two-model setup needs. Short requests read only 27–36 MB from disk; a cold 128K
   prompt reads ~3 GB, which is why its first token takes ~3.5 minutes. Later turns reuse the prompt cache.
 - **Start MiniCPM first.** Its KV pool is reserved at load, so memory use is close to its maximum from the
-  start; `bin/up.sh` refuses to continue if free memory falls under `MEM_FLOOR_MIB` (6 GiB).
+  start. After MiniCPM is up, `bin/up.sh` only loads Qwen if ~56 GB plus the `MEM_FLOOR_MIB` floor
+  (6 GiB) is still free, and checks the floor again once both are loaded. If any step fails, it stops
+  the servers it started.
 - **Low-memory guard.** `bin/up.sh` starts `bin/guard.sh`, which stops both servers cleanly if free memory
   drops below the floor. It never tripped in testing (minimum observed 22.4 GB free).
 
@@ -86,7 +88,7 @@ providers:
 delegation:
   provider: minicpm-spark
   model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw
-  max_concurrent_children: 8        # = MINI_MAX_BATCH; extra delegated tasks queue in Hermes
+  max_concurrent_children: 8        # = MINI_MAX_BATCH; larger delegate_task batches get a tool error
   oneshot_max_children: 0           # default 2 would cap one-shot runs at two subagents
   compression_threshold_tokens: 65536
 ```
@@ -99,8 +101,9 @@ bash hermes/install.sh                    # -> ~/.hermes-twomodel, writes MINICP
 HERMES_HOME=~/.hermes-twomodel hermes
 ```
 
-Concurrency is dynamic: Qwen may delegate 1 task or 30. Hermes runs up to `max_concurrent_children`
-subagents at once and queues the rest; MiniCPM batches whatever is active up to `MINI_MAX_BATCH`.
+Concurrency is dynamic up to a cap. One `delegate_task` call may carry up to `max_concurrent_children`
+tasks; Hermes rejects a larger call with a tool error telling the agent to split it, and the agent then
+delegates in batches. MiniCPM batches whatever is active up to `MINI_MAX_BATCH`.
 
 **Verified routing.** In a 16-subagent fan-out, Hermes's own session database recorded 44 subagent
 sessions, all on MiniCPM, and 5 parent sessions, all on Qwen, with nothing cross-routed. The two

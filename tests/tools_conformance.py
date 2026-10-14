@@ -60,8 +60,8 @@ for who in sys.argv[1:] or ["qwen", "mini"]:
     c, tc, fin = call(who, [{"role": "user", "content": "Read the file /etc/hostname and tell me the hostname."}], False, tool_choice="required")
     msgs = [{"role": "user", "content": "Read the file /etc/hostname and tell me the hostname."},
             {"role": "assistant", "content": c or "", "tool_calls": [{"id": tc[0]["id"] or "call_0", "type": "function", "function": tc[0]["function"]}]} if tc else {"role": "assistant", "content": ""},
-            {"role": "tool", "tool_call_id": (tc[0]["id"] if tc else "call_0") or "call_0", "content": "spark-gb10-lab\n"}]
+            {"role": "tool", "tool_call_id": (tc[0]["id"] if tc else "call_0") or "call_0", "content": "example-host-7f3a\n"}]
     c2, tc2, fin2 = call(who, msgs, False)
-    ok.append(check(f"{who} tool-result round trip", bool(tc) and not tc2 and c2 and "spark-gb10-lab" in c2, repr(c2)[:100]))
+    ok.append(check(f"{who} tool-result round trip", bool(tc) and not tc2 and c2 and "example-host-7f3a" in c2, repr(c2)[:100]))
     results[who] = (sum(ok), len(ok))
 print("SUMMARY", json.dumps(results))

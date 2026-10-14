@@ -34,8 +34,10 @@ auxiliary:
 delegation:
   provider: minicpm-spark             # every subagent goes to MiniCPM
   model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw
-  max_concurrent_children: 8          # = MINI_MAX_BATCH; extra delegated tasks queue in Hermes
+  max_concurrent_children: 8          # = MINI_MAX_BATCH. A delegate_task call with more tasks is rejected
+                                      # with a tool error; the main agent then splits the work into batches.
   oneshot_max_children: 0             # default 2 caps one-shot runs; 0 = unlimited
   max_iterations: 60
   compression_threshold_tokens: 65536 # keep subagent prompts short so batched prefill stays fast
   child_timeout_seconds: 3600
+  worktree_isolation: true            # in a git repo, each child works in its own worktree (no shared files)

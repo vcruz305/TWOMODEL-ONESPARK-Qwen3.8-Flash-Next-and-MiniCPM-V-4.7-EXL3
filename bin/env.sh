@@ -42,6 +42,13 @@ http_code() { local url="$1" hdr="${2:-}" c
   if [[ -n "$hdr" ]]; then c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' -H "$hdr" "$url" 2>/dev/null || true)
   else c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true); fi
   echo "${c:-000}"; }
+# PID records are "<pid> <start-time>" (field 22 of /proc/<pid>/stat), so a stale record whose PID was
+# reused by an unrelated process is never signalled.
+proc_start() { awk '{print $22}' "/proc/$1/stat" 2>/dev/null || true; }
+record_pid() { echo "$2 $(proc_start "$2")" > "$LOG_DIR/$1.pid"; }
+# Prints the recorded PID only if that exact process (same start time) is still alive.
+live_pid() { local f="$LOG_DIR/$1.pid" p s; [[ -f "$f" ]] || return 0; read -r p s < "$f" || true
+  [[ -n "${p:-}" && -n "${s:-}" && "$(proc_start "$p")" == "$s" ]] && echo "$p" || true; }
 mem_avail_mib() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
 # Prints the MiniCPM API key, or nothing if the server has not written it yet. Always returns 0 so
 # callers running under "set -e" can poll it while the server starts.
