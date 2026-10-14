@@ -10,8 +10,8 @@ MINI_KEY="$(mini_key)"; export MINI_KEY
 # Preflight: refuse to run against servers that are not up, so a failed bin/up.sh can't turn into
 # a page of misleading test failures.
 [[ -n "$MINI_KEY" ]] || die "no MiniCPM key at $MINI_STATE/api_tokens.yml; is bin/up.sh running?"
-q=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$QWEN_PORT/v1/models")
-m=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $MINI_KEY" "http://127.0.0.1:$MINI_PORT/v1/models")
+q=$(http_code "http://127.0.0.1:$QWEN_PORT/v1/models")
+m=$(http_code "http://127.0.0.1:$MINI_PORT/v1/models" "Authorization: Bearer $MINI_KEY")
 [[ "$q" == 200 && "$m" == 200 ]] || die "servers not ready (qwen http=$q, minicpm http=$m); run bin/up.sh first"
 rc=0
 O="$LOG_DIR/results-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$O"; export OUT_DIR="$O"

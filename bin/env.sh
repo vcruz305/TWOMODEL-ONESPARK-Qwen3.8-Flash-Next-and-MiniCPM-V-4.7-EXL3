@@ -37,6 +37,11 @@ MEM_FLOOR_MIB="${MEM_FLOOR_MIB:-6144}"
 
 say() { printf '==> %s\n' "$*" >&2; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+# HTTP status of a URL, "000" if nothing is listening yet. Never fails, so it is safe under "set -e".
+http_code() { local url="$1" hdr="${2:-}" c
+  if [[ -n "$hdr" ]]; then c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' -H "$hdr" "$url" 2>/dev/null || true)
+  else c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true); fi
+  echo "${c:-000}"; }
 mem_avail_mib() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
 # Prints the MiniCPM API key, or nothing if the server has not written it yet. Always returns 0 so
 # callers running under "set -e" can poll it while the server starts.

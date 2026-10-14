@@ -15,8 +15,7 @@ wait_up() { # name url header
   local name="$1" url="$2" hdr="${3:-}" pidf="$LOG_DIR/$1.pid"
   for _ in $(seq 1 450); do
     kill -0 "$(cat "$pidf")" 2>/dev/null || { tail -40 "$LOG_DIR/$name.log" >&2; die "$name server exited during startup"; }
-    if [[ -n "$hdr" ]]; then code=$(curl -s -o /dev/null -w '%{http_code}' -H "$hdr" "$url"); else code=$(curl -s -o /dev/null -w '%{http_code}' "$url"); fi
-    [[ "$code" == 200 ]] && return 0
+    [[ "$(http_code "$url" "$hdr")" == 200 ]] && return 0
     sleep 2
   done
   die "$name did not become ready"

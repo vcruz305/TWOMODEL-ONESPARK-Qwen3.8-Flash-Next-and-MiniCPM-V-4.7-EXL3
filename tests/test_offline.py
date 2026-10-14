@@ -42,6 +42,42 @@ class Shell(unittest.TestCase):
                 self.assertNotRegex(t, r"\b[0-9a-f]{64}\b(?!.*commit)" if f.suffix != ".json" else r"api_key\"\s*:\s*\"[0-9a-f]{32,}", f)
                 self.assertNotIn("/home/cruzspark", t, f); self.assertNotIn("sage-campaigns", t, f)
 
+class Lifecycle(unittest.TestCase):
+    """Run the real bin/up.sh, status.sh, run_all.sh preflight and down.sh against stub servers that take a
+    few seconds to start (key file appears late, port refuses connections at first), like the real ones."""
+    def test_up_status_down_with_slow_servers(self):
+        import socket, tempfile
+        if subprocess.run(["bash", "-c", "command -v curl"], capture_output=True).returncode:
+            self.skipTest("curl not installed")
+        def free_port():
+            s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); qp, mp = free_port(), free_port()
+            for name, port, key in (("qwen", qp, ""), ("minicpm", mp, f"{h}/minicpm-state/api_tokens.yml")):
+                d = h / f"{name}-recipe/exllamav3-tabby"; d.mkdir(parents=True)
+                (d / "serve.sh").write_text(f"exec python3 {ROOT/'tests/stub_server.py'} {port} 4 {key}\n")
+                m = h / f"{name}-model"; m.mkdir(); (m / "config.json").write_text("{}")
+            env = {**os.environ, "TWOMODEL_HOME": str(h), "QWEN_PORT": str(qp), "MINI_PORT": str(mp),
+                   "QWEN_MODEL_DIR": str(h / "qwen-model"), "MINI_MODEL_DIR": str(h / "minicpm-model"),
+                   "MEM_FLOOR_MIB": "1", "PATH": os.environ["PATH"]}
+            run = lambda *a: subprocess.run(["bash", *a], capture_output=True, text=True, env=env, timeout=120)
+            try:
+                up = run(str(ROOT / "bin/up.sh"))
+                self.assertEqual(up.returncode, 0, up.stderr[-1500:])
+                self.assertIn("both servers ready", up.stderr)
+                st = run(str(ROOT / "bin/status.sh"))
+                self.assertIn(f":{qp}  http=200", st.stdout); self.assertIn(f":{mp}  http=200", st.stdout)
+                pre = run("-c", f"source {ROOT/'bin/env.sh'}; MINI_KEY=$(mini_key); "
+                                f"[[ $(http_code http://127.0.0.1:{mp}/v1/models \"Authorization: Bearer $MINI_KEY\") == 200 ]] && echo PREFLIGHT_OK")
+                self.assertIn("PREFLIGHT_OK", pre.stdout)
+            finally:
+                run(str(ROOT / "bin/down.sh"))
+            st = run(str(ROOT / "bin/status.sh"))
+            self.assertIn(f":{qp}  http=000", st.stdout); self.assertIn(f":{mp}  http=000", st.stdout)
+            # run_all.sh must refuse to run against stopped servers instead of reporting test failures.
+            ra = run(str(ROOT / "tests/run_all.sh"), "tools")
+            self.assertNotEqual(ra.returncode, 0); self.assertRegex(ra.stderr, "no MiniCPM key|servers not ready")
+
 class Hermes(unittest.TestCase):
     def cfg(self):
         import yaml

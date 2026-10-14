@@ -17,6 +17,15 @@ Includes a tested [Hermes Agent](https://github.com/NousResearch/hermes-agent) c
 | Tool calling (14 checks each) | 7/7 · 7/7 stream | 7/7 · 7/7 stream |
 | Hermes fan-out, all answers correct | — | 16/16 subagents |
 
+## Models
+
+| Role | Quantized checkpoint (what runs) | Base model |
+|---|---|---|
+| Main agent | [turboderp/Qwen3.8-Flash-Next-exl3](https://huggingface.co/turboderp/Qwen3.8-Flash-Next-exl3/tree/3.05bpw_h5_ng5), branch `3.05bpw_h5_ng5` (EXL3 3.05 bpw, 5-bit head, 5-bit n-gram table) | [Qwen/Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| Subagents | [vcruz305/MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw](https://huggingface.co/vcruz305/MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw) (SAGE EXL3 3.74 bpw) | [openbmb/MiniCPM-V-4.7-35B-A3B](https://huggingface.co/openbmb/MiniCPM-V-4.7-35B-A3B) |
+
+`bin/download.sh` fetches these two checkpoints, plus the dSparK drafter that the MiniCPM recipe downloads alongside its checkpoint (downloads resume if interrupted).
+
 This repo contains only orchestration, configuration and tests. It reuses the two single-model recipes,
 which both track the **latest** `vcruz305/exllamav3` master and `vcruz305/tabbyAPI` main: nothing is pinned.
 
