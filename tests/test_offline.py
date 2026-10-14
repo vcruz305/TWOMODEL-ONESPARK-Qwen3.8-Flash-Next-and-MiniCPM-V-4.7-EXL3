@@ -134,6 +134,48 @@ class Robustness(unittest.TestCase):
             finally:
                 victim.kill(); ours.kill()
 
+class HermesInstall(unittest.TestCase):
+    def test_install_writes_guidance_once_and_keeps_user_soul(self):
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as h:
+            h = Path(h); st = h / "minicpm-state"; st.mkdir()
+            (st / "api_tokens.yml").write_text(json.dumps({"api_key": "k-test", "admin_key": "a"}))
+            hh = h / "hermes"; hh.mkdir(); (hh / "SOUL.md").write_text("My own identity text.\n")
+            env = {**os.environ, "TWOMODEL_HOME": str(h), "HERMES_HOME": str(hh)}
+            for _ in range(2):
+                r = subprocess.run(["bash", str(ROOT / "hermes/install.sh")], capture_output=True, text=True, env=env)
+                self.assertEqual(r.returncode, 0, r.stderr)
+            soul = (hh / "SOUL.md").read_text()
+            self.assertIn("My own identity text.", soul)
+            self.assertEqual(soul.count("twomodels-onespark:delegation:begin"), 1)
+            self.assertIn("terminal or execute_code tool", soul)
+            self.assertIn("MINICPM_API_KEY=k-test", (hh / ".env").read_text())
+
+class FanoutScorer(unittest.TestCase):
+    def extractor(self):
+        src = (ROOT / "tests/hermes_fanout.sh").read_text()
+        body = src.split("<<'EOF'", 1)[1].split("\nEOF", 1)[0]
+        start = body.index("def answer_value"); end = body.index("\nsid =")
+        ns = {"re": __import__("re")}; exec(body[start:end], ns); return ns["answer_value"]
+    def test_real_replies(self):
+        f = self.extractor()
+        cases = [
+            ("- **What I did**: Read the file `d4.txt` and used `awk`.\n- **What I found**: The sum of the last column is **3239**.\n"
+             "- **Files accessed**: `/x/n4/d4.txt`\n- **Issues encountered**: None", "d4.txt", 3239),
+            ('{"sum": 3114}', "d5.txt", 3114),
+            ("3364", "d2.txt", 3364),
+            ("The sum of the last column in `d4.txt` is **3239**.", "d4.txt", 3239),
+            ("Total = 98 + 99 + 100 + 1653 = 2950\n\n**2950**", "d1.txt", 2950),
+            ("I could not read d6.txt.", "d6.txt", None),
+            # worked sums with intermediate subtotals: the answer is the final value, not the first subtotal
+            ("- Lines 1-28: 18, 21, ..., 99 (arithmetic sequence, sum = 1638)\n- Line 29: 1\n"
+             "Total sum = 1638 + 1 + 1616 = 3255\n\n3255", "d3.txt", 3255),
+            ("Sum = 98 + 99 + 100 + (0 + ... + 57) = 297 + 1653 = 1950\n\n1950", "d1.txt", 1950),
+            ("Total sum = 513 + 510 + 500 + 490 + 480 + 482 = 2475\n\n2475", "d10.txt", 2475),
+        ]
+        for text, fname, want in cases:
+            self.assertEqual(f(text, fname), want, text[:60])
+
 class Hermes(unittest.TestCase):
     def cfg(self):
         import yaml
@@ -164,9 +206,13 @@ class Results(unittest.TestCase):
     def test_readme_numbers_come_from_results(self):
         r = json.loads((ROOT / "results/measured-2026-10-13.json").read_text())
         t = (ROOT / "README.md").read_text()
-        ok = sum(int(x["correct"].split("/")[0]) for x in r["hermes_fanout"]); n = sum(int(x["correct"].split("/")[1]) for x in r["hermes_fanout"])
-        self.assertEqual(f"{ok}/{n}", r["hermes_fanout_total_correct"]); self.assertIn(f"{ok}/{n} subagents", t)
-        for v in ("16/16", "206 s", "1,442", "25.8", "22.4 GB", "94.0"): self.assertIn(v, t)
+        acc = r["subagent_accuracy_2026_10_14"]["runs"]
+        shipped = [x for x in acc if x["setup"].startswith("shipped")]
+        ok = sum(int(x["child_correct"].split("/")[0]) for x in shipped); n = sum(int(x["child_correct"].split("/")[1]) for x in shipped)
+        self.assertIn(f"{ok}/{n} subagents", t)
+        for x in acc: self.assertIn(x["child_correct"], t)
+        for v in ("206 s", "1,442", "25.8", "22.4 GB", "94.0"): self.assertIn(v, t)
         self.assertEqual(r["hermes_routing_check"]["cross_routed"], 0)
+        self.assertTrue((ROOT / "hermes/patch_hermes.sh").exists()); self.assertIn("patch_hermes.sh", t)
 
 if __name__ == "__main__": unittest.main()

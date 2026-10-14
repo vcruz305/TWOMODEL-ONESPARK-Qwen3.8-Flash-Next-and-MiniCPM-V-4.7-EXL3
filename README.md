@@ -15,7 +15,7 @@ Includes a tested [Hermes Agent](https://github.com/NousResearch/hermes-agent) c
 | Cold 128K prompt, other model loaded | 206 s to first token, 90 tok/s decode | 90 s, 55 tok/s |
 | Needle retrieval at 128K | 2/2 | 2/2 |
 | Tool calling (14 checks each) | 7/7 · 7/7 stream | 7/7 · 7/7 stream |
-| Hermes fan-out answers correct (all runs) | — | 60/64 subagents |
+| Hermes fan-out, every subagent's own answer correct (shipped setup) | — | 60/60 subagents |
 
 ## Models
 
@@ -97,9 +97,16 @@ Install it into a dedicated Hermes profile (your main `~/.hermes` is not touched
 
 ```bash
 bash bin/up.sh
-bash hermes/install.sh                    # -> ~/.hermes-twomodel, writes MINICPM_API_KEY to its .env
+bash hermes/patch_hermes.sh               # upstream fix NousResearch/hermes-agent#135354 (see below)
+bash hermes/install.sh                    # -> ~/.hermes-twomodel: config, MINICPM_API_KEY, delegation guidance
 HERMES_HOME=~/.hermes-twomodel hermes
 ```
+
+`hermes/install.sh` also adds [hermes/delegation-guidance.md](hermes/delegation-guidance.md) to the
+profile's `SOUL.md` (between markers, so re-running replaces it and your own text is kept). It tells
+Qwen to give subagents exact paths, to have them compute anything exact with the terminal or
+`execute_code` tool rather than in their reply, and to check their results. The config also turns on
+`delegation.worktree_isolation`, so inside a git repo each subagent works in its own worktree.
 
 Concurrency is dynamic up to a cap. One `delegate_task` call may carry up to `max_concurrent_children`
 tasks; Hermes rejects a larger call with a tool error telling the agent to split it, and the agent then
@@ -111,33 +118,44 @@ servers' request logs agreed.
 
 ## Subagent concurrency
 
-**Real Hermes fan-out** (Qwen delegates file-summing tasks; every subagent reads its file and returns a sum):
+### Subagent accuracy: what was wrong, and the fix
 
-| Subagents | Correct | Total time | Slowest subagent |
-|---:|---:|---:|---:|
-| 4 | 4/4 | 92 s | 55 s |
-| 8 | 8/8 | 123 s | 95 s |
-| 12 | 12/12 | 218 s | 185 s |
-| 16 | 16/16 | 321 s | 280 s |
-| 4 (fresh-clone run, 14 Oct) | 3/4 | 104 s | 38 s |
-| 8 (fresh-clone run, 14 Oct) | 8/8 | 105 s | 75 s |
-| 4 (live check, 14 Oct) | 4/4 | 70 s | 40 s |
-| 8 (live check, 14 Oct) | **5/8** | 191 s | 155 s |
+Each fan-out has Qwen delegate N file-summing tasks to MiniCPM. The test reads **every subagent's own
+final answer** from Hermes's session database and checks it against the true sum. An earlier version of
+this table only checked Qwen's summary, which hid wrong subagents whenever Qwen recomputed the files itself.
 
-All 64 subagents ran on MiniCPM and every parent turn on Qwen; the 4 misses were answer errors, not
-routing or tool failures. Reading each failed subagent's Hermes session:
+Reading every failed subagent's session turned up three causes, none of them MiniCPM's ability to do the task:
 
-- **Mental arithmetic (1 miss):** read the file correctly, then summed 61 numbers in its head (1,895 vs 1,950).
-- **Structured-output retry (3 misses, same 8-way run):** Qwen attached an `output_schema` (`{"sum": number}`)
-  to every task. These subagents computed the right sum with the terminal tool (3,114, 3,183, 3,364) but
-  answered in prose first. Hermes's single correction turn then made them start over: one replied
-  `{"sum": 0}`, and two re-read the shared folder, picked up a sibling's `sum.json` or summed all eight
-  files, and returned 1,950 and 26,337.
+1. **Hermes output-schema retry starts from an empty conversation.** When Qwen attaches an
+   `output_schema` and a subagent first answers in prose, Hermes runs one correction turn, but without
+   the subagent's task, tool results or answer ([NousResearch/hermes-agent#135354](https://github.com/NousResearch/hermes-agent/pull/135354),
+   open). Subagents that had already computed the right sum with `awk` then guessed: `0`, a sibling's
+   `sum.json`, the sum of every file. `hermes/patch_hermes.sh` applies that PR until it is merged.
+2. **Mental arithmetic.** About a quarter of subagents summed 61 numbers in their reply instead of
+   running a command, and some of those were off by hundreds. The delegation guidance tells Qwen to
+   have subagents compute exact values with a tool.
+3. **No sampler fallbacks on MiniCPM.** Hermes sends no sampler values, and TabbyAPI then samples from the
+   full ~248K vocabulary (top_k 0, top_p 1.0). The MiniCPM recipe now falls back to the model's own
+   `generation_config.json` values (temperature 1.0, top_k 20, top_p 0.95), as the Qwen recipe already did.
 
-**Treat MiniCPM subagent answers that must be exact as unverified.** In practice: give each subagent
-its own working directory, ask it to compute with the terminal tool, and check its numbers in the
-parent. The fan-out test fails on any wrong answer, so these numbers are what you should expect, not
-best cases.
+Controlled runs, 14 Oct, one Spark, same servers and prompts. "Forced schema" tells Qwen to attach an
+`output_schema` to every task, which exercises cause 1 on purpose:
+
+| Setup | Fan-outs | Subagents correct |
+|---|---|---:|
+| Sampler fix only, stock Hermes | 3 × 8 | 18/24 |
+| Hermes fix only (no sampler fix, no guidance) | 3 × 8 | 24/24 |
+| Sampler + Hermes fix, no guidance | 8, 8, 8, 16, 4 | 40/44 (4 mental-arithmetic misses) |
+| Forced schema, stock Hermes, sampler fix | 2 × 8 | 9/16 |
+| Forced schema, Hermes fix, sampler fix | 8, 8, 8, 16 | 40/40 |
+| **Shipped setup** (all three fixes), plain | 8, 8, 8, 16, 4 | **44/44** |
+| **Shipped setup**, forced schema | 2 × 8 | **16/16** |
+
+In the shipped-setup runs every subagent computed its sum with a tool, and the true sum appears in its
+own terminal output (60/60). All subagents ran on MiniCPM and every parent turn on Qwen. The fan-out
+test fails on any wrong subagent answer, not just a wrong final summary.
+
+Subagents are still a smaller model: give them precise tasks and check what matters.
 
 **Agent-sized prompts** (7.2K-token context with tool schemas, 300 tokens out) while Qwen keeps decoding:
 
@@ -181,10 +199,11 @@ bash tests/run_all.sh tools hermes         # a subset
 | `tools` | Required single call, auto zero calls, parallel calls (stream + non-stream), tool-result round trip, on both servers |
 | `decode` | Batched MiniCPM decode at 1/4/8 requests; Qwen single stream |
 | `concurrency` | 1–8 agent-sized MiniCPM requests while Qwen decodes; per-request and combined tok/s, TTFT, free memory |
-| `hermes` | Real Hermes one-shot runs where Qwen fans 4 and 8 tasks out to MiniCPM; answers checked against ground truth, request counts per server |
+| `hermes` | Real Hermes one-shot runs: Qwen fans 4 and 8 tasks out to MiniCPM, plus an 8-task run with a forced `output_schema`; every subagent's own answer and Qwen's summary are checked against ground truth, and requests are counted per server |
 | `longctx` | Cold 128K on each model with the other loaded, then 64K on both at once, with planted needles (generated from the local CPython stdlib) |
 
-The `hermes` test needs Hermes Agent installed (`hermes` on PATH) and `hermes/install.sh` run first.
+The `hermes` test needs Hermes Agent installed (`hermes` on PATH), `hermes/patch_hermes.sh` and
+`hermes/install.sh` run first. Offline checks (no GPU): `python3 -m unittest discover -s tests -p "test_*.py"`.
 
 ## How these numbers were measured
 
@@ -193,7 +212,9 @@ MiniCPM ran ExLlamaV3 master `475461e9`. The side-by-side Qwen runs used the Qwe
 engine `24f0dece3`; on latest master `475461e9` Qwen decoded 94.0 / 56.4 / 93.8 tok/s (code / prose /
 math) versus 89.0 / 55.5 / 89.3 on the pin, passed 7/7 tool checks, and passed the Qwen recipe's frozen
 numerical gate with 0 core failures (4 investigate-only KL items). Hermes Agent `d97007c3` (v0.22.0).
-Raw values: [results/measured-2026-10-13.json](results/measured-2026-10-13.json).
+Throughput and long-context numbers were measured before the MiniCPM sampler fallbacks were added (the
+fallbacks change which tokens are sampled, not the work per token). Subagent accuracy numbers are from
+the 14 Oct controlled runs above. Raw values: [results/measured-2026-10-13.json](results/measured-2026-10-13.json).
 
 **Not yet measured:** a 24-hour or week-long run; behaviour when MiniCPM's shared KV pool fills;
 concurrency above 12 in the synthetic sweep (Hermes fan-out was tested to 16).

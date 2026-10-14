@@ -23,7 +23,8 @@ for t in $want; do
     decode)      python3 "$ROOT/tests/batch_decode.py" "$MINI_PORT" 1,4,8 minicpm | tee "$O/decode-minicpm.jsonl" || rc=1
                  python3 "$ROOT/tests/batch_decode.py" "$QWEN_PORT" 1 qwen | tee "$O/decode-qwen.jsonl" || rc=1 ;;
     concurrency) python3 "$ROOT/tests/conc_sweep.py" "$O/concurrency.json" 1,2,4,8 | tee "$O/concurrency.jsonl" || rc=1 ;;
-    hermes)      bash "$ROOT/tests/hermes_fanout.sh" 4 8 | tee "$O/hermes.jsonl" || rc=1 ;;
+    hermes)      bash "$ROOT/tests/hermes_fanout.sh" 4 8 | tee "$O/hermes.jsonl" || rc=1
+                 FANOUT_SCHEMA=1 bash "$ROOT/tests/hermes_fanout.sh" 8 | tee "$O/hermes-schema.jsonl" || rc=1 ;;
     longctx)     python3 "$ROOT/tests/longctx_side.py" "$O/longctx.json" | tee "$O/longctx.jsonl" || rc=1 ;;
     *) die "unknown test $t" ;;
   esac

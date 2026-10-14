@@ -1,0 +1,107 @@
+diff --git a/tests/tools/test_delegate_output_schema.py b/tests/tools/test_delegate_output_schema.py
+index 456895eaef747..58eb9475e36ce 100644
+--- a/tests/tools/test_delegate_output_schema.py
++++ b/tests/tools/test_delegate_output_schema.py
+@@ -151,6 +151,37 @@ def close(self):
+         return None
+ 
+ 
++class _TranscriptChild(_StubChild):
++    """Keeps a transcript the way the real loop does: a turn starts from the
++    ``conversation_history`` it is handed and returns that history plus its own
++    messages. Only the first turn calls a tool."""
++
++    def __init__(self, responses):
++        super().__init__(responses)
++        self.histories: list = []
++
++    def run_conversation(self, user_message, task_id=None, conversation_history=None, **_kwargs):
++        self.histories.append(list(conversation_history or []))
++        self.calls.append(user_message)
++        text = self.responses.pop(0)
++        turn = [{"role": "user", "content": user_message}]
++        if len(self.calls) == 1:
++            turn += [
++                {"role": "assistant", "content": "", "tool_calls": [{
++                    "id": "call_1", "type": "function",
++                    "function": {"name": "web_search", "arguments": '{"query": "office address"}'},
++                }]},
++                {"role": "tool", "tool_call_id": "call_1", "content": "Karl Johans gate 1, 0154 Oslo"},
++            ]
++        turn.append({"role": "assistant", "content": text})
++        return {
++            "final_response": text,
++            "completed": True,
++            "api_calls": 1,
++            "messages": list(conversation_history or []) + turn,
++        }
++
++
+ class _StubParent:
+     _current_task_id = None
+     _delegate_depth = 0
+@@ -195,6 +226,27 @@ def test_invalid_twice_surfaces_errors_and_stops(self):
+         # exactly ONE retry — bounded
+         assert len(child.calls) == 2
+ 
++    def test_retry_continues_the_childs_transcript(self):
++        """The retry is the next turn of the same conversation (#135252). The goal is only the
++        child's first user turn, so a retry from an empty history asks the child to correct an
++        answer it can no longer see, for a task it was never shown."""
++        child = _TranscriptChild(["The office is in Oslo.", '{"city": "Oslo"}'])
++        child._delegate_output_schema = ADDRESS_SCHEMA
++        entry = _run(child)
++        retry_history = child.histories[1]
++        assert [m["content"] for m in retry_history if m["role"] == "user"] == ["produce the address"]
++        assert any(m["role"] == "tool" for m in retry_history)
++        assert retry_history[-1] == {"role": "assistant", "content": "The office is in Oslo."}
++        assert entry["schema_valid"] is True
++
++    def test_retry_counts_first_turn_tool_calls_once(self):
++        """run_conversation returns the cumulative transcript, so the retry's messages already
++        hold the first turn; the parent's tool trace must not report it twice."""
++        child = _TranscriptChild(["The office is in Oslo.", '{"city": "Oslo"}'])
++        child._delegate_output_schema = ADDRESS_SCHEMA
++        entry = _run(child)
++        assert [t["tool"] for t in entry["tool_trace"]] == ["web_search"]
++
+     def test_retry_exception_degrades_to_invalid(self):
+         child = _StubChild(["nope"])
+         child._delegate_output_schema = ADDRESS_SCHEMA
+diff --git a/tools/delegate_tool_child_run.py b/tools/delegate_tool_child_run.py
+index d676408333a23..8d06a763c808e 100644
+--- a/tools/delegate_tool_child_run.py
++++ b/tools/delegate_tool_child_run.py
+@@ -491,6 +491,9 @@ def _validate_child_output_schema(
+ 
+     # Exactly one retry turn, carrying the validation errors verbatim (no
+     # schema re-paste — the child already holds the contract in its context).
++    # It continues the child's transcript: the goal is only the first user turn,
++    # so a fresh history would ask the child to fix an answer it can no longer see.
++    _history = result.get("messages")
+     _retry_result = None
+     try:
+         # Same identity as the main child turn: this runs on the parent worker's thread, and an
+@@ -499,7 +502,7 @@ def _validate_child_output_schema(
+         with delegated_child_context(str(getattr(child, "session_id", "") or "")):
+             _retry_result = child.run_conversation(
+                 user_message=build_retry_message(_schema_errors), task_id=child_task_id,
+-                stream_callback=relay_child_text,
++                conversation_history=_history or None, stream_callback=relay_child_text,
+             )
+     except Exception as _retry_exc:
+         logger.warning("Subagent %d schema-retry turn failed: %s", task_index, _retry_exc)
+@@ -512,8 +515,11 @@ def _validate_child_output_schema(
+         except (TypeError, ValueError):
+             pass
+         _retry_messages = _retry_result.get("messages")
+-        if isinstance(_retry_messages, list) and isinstance(result.get("messages"), list):
+-            result["messages"] = result["messages"] + _retry_messages
++        if isinstance(_retry_messages, list) and isinstance(_history, list):
++            # The returned transcript re-holds _history's own dicts: append only what the retry
++            # added, so the tool trace counts the first turn once even if the retry compacted.
++            _seen = {id(m) for m in _history}
++            result["messages"] = _history + [m for m in _retry_messages if id(m) not in _seen]
+         _schema_valid, _schema_errors = validate_output(_retry_text, _output_schema)
+     return _SchemaOutcome(_output_schema, _schema_valid, _schema_errors, 1)
+ 

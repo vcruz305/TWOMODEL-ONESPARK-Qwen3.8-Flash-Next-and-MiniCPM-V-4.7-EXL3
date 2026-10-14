@@ -119,25 +119,29 @@
    "subagents": 4,
    "correct": "4/4",
    "wall_s": 91.6,
-   "slowest_child_s": 55.39
+   "slowest_child_s": 55.39,
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 8,
    "correct": "8/8",
    "wall_s": 122.8,
-   "slowest_child_s": 94.84
+   "slowest_child_s": 94.84,
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 12,
    "correct": "12/12",
    "wall_s": 218.0,
-   "slowest_child_s": 185.41
+   "slowest_child_s": 185.41,
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 16,
    "correct": "16/16",
    "wall_s": 320.8,
-   "slowest_child_s": 280.44
+   "slowest_child_s": 280.44,
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 4,
@@ -145,21 +149,24 @@
    "wall_s": 104.3,
    "slowest_child_s": 38.1,
    "run": "fresh clone 40995ba, 2026-10-14",
-   "note": "d1.txt answered 1895, truth 1950: MiniCPM mental-arithmetic error after a correct read_file"
+   "note": "d1.txt answered 1895, truth 1950: MiniCPM mental-arithmetic error after a correct read_file",
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 8,
    "correct": "8/8",
    "wall_s": 104.5,
    "slowest_child_s": 74.62,
-   "run": "fresh clone 40995ba, 2026-10-14"
+   "run": "fresh clone 40995ba, 2026-10-14",
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 4,
    "correct": "4/4",
    "wall_s": 69.6,
    "slowest_child_s": 39.93,
-   "run": "live check, title routing to MiniCPM, 2026-10-14"
+   "run": "live check, title routing to MiniCPM, 2026-10-14",
+   "scoring": "final summary only (superseded)"
   },
   {
    "subagents": 8,
@@ -167,7 +174,8 @@
    "wall_s": 191.4,
    "slowest_child_s": 154.81,
    "run": "live check, title routing to MiniCPM, 2026-10-14",
-   "note": "Qwen attached output_schema {sum:number}; 3 children computed correct sums (3114, 3183, 3364) via terminal, answered in prose, and the single output-contract retry turn produced 0, 1950 (sibling sum.json) and 26337 (all files summed)"
+   "note": "Qwen attached output_schema {sum:number}; 3 children computed correct sums (3114, 3183, 3364) via terminal, answered in prose, and the single output-contract retry turn produced 0, 1950 (sibling sum.json) and 26337 (all files summed)",
+   "scoring": "final summary only (superseded)"
   }
  ],
  "hermes_routing_check": {
@@ -211,10 +219,85 @@
    "nvme_read_gb": 1.9
   }
  ],
- "hermes_fanout_total_correct": "60/64",
  "hermes_title_generation": {
   "routed_to": "minicpm-spark",
   "qwen_template_errors": 0,
   "example_title": "Multiply 17 by 23"
+ },
+ "subagent_accuracy_2026_10_14": {
+  "scoring": "each subagent's own final answer from Hermes state.db vs ground truth; cross-check: true sum present in the subagent's terminal output",
+  "runs": [
+   {
+    "setup": "sampler fix, stock Hermes",
+    "fanouts": [
+     8,
+     8,
+     8
+    ],
+    "child_correct": "18/24"
+   },
+   {
+    "setup": "Hermes PR #135354, no sampler fix, no guidance",
+    "fanouts": [
+     8,
+     8,
+     8
+    ],
+    "child_correct": "24/24"
+   },
+   {
+    "setup": "sampler fix + Hermes fix, no guidance",
+    "fanouts": [
+     8,
+     8,
+     8,
+     16,
+     4
+    ],
+    "child_correct": "40/44",
+    "misses": "4 mental arithmetic"
+   },
+   {
+    "setup": "forced output_schema, stock Hermes, sampler fix",
+    "fanouts": [
+     8,
+     8
+    ],
+    "child_correct": "9/16"
+   },
+   {
+    "setup": "forced output_schema, Hermes fix, sampler fix",
+    "fanouts": [
+     8,
+     8,
+     8,
+     16
+    ],
+    "child_correct": "40/40"
+   },
+   {
+    "setup": "shipped: sampler fix + Hermes fix + delegation guidance + worktree_isolation",
+    "fanouts": [
+     8,
+     8,
+     8,
+     16,
+     4
+    ],
+    "child_correct": "44/44",
+    "true_sum_in_child_tool_output": "44/44"
+   },
+   {
+    "setup": "shipped, forced output_schema",
+    "fanouts": [
+     8,
+     8
+    ],
+    "child_correct": "16/16",
+    "true_sum_in_child_tool_output": "16/16"
+   }
+  ],
+  "hermes": "d97007c3 (v0.22.0) + NousResearch/hermes-agent#135354 where stated",
+  "engine": "ExLlamaV3 475461e9 / TabbyAPI 880e6b8 for both models"
  }
 }
