@@ -17,6 +17,11 @@ class Shell(unittest.TestCase):
             t = f.read_text()
             self.assertNotRegex(t, r"(EXL3_REF|TABBY_REF)=[\"']?\$\{?[A-Z_]*:?-?[0-9a-f]{7,40}", f)
         self.assertIn("unset EXL3_REF TABBY_REF", (ROOT / "bin/setup.sh").read_text())
+    def test_up_backgrounds_in_current_shell(self):
+        # A "( ... & echo $! > pid )" subshell waits for the background server and up.sh never returns.
+        t = (ROOT / "bin/up.sh").read_text()
+        self.assertNotRegex(t, r"\(\s*cd [^)]*&\s*echo \$!", "server must be backgrounded in up.sh's own shell")
+        self.assertEqual(t.count("setsid nohup"), 3)
     def test_defaults(self):
         batch, ngram, cache, seq, qp, mp = env_defaults()
         self.assertEqual((ngram, qp, mp), ("false", "8899", "8898"))
