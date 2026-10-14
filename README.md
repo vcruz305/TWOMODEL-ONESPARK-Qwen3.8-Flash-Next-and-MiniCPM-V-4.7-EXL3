@@ -15,7 +15,7 @@ Includes a tested [Hermes Agent](https://github.com/NousResearch/hermes-agent) c
 | Cold 128K prompt, other model loaded | 206 s to first token, 90 tok/s decode | 90 s, 55 tok/s |
 | Needle retrieval at 128K | 2/2 | 2/2 |
 | Tool calling (14 checks each) | 7/7 · 7/7 stream | 7/7 · 7/7 stream |
-| Hermes fan-out, every subagent's own answer correct (shipped setup) | — | 60/60 subagents |
+| Hermes fan-out, every subagent's own answer correct (shipped setup) | — | 80/80 subagents |
 
 ## Models
 
@@ -150,9 +150,10 @@ Controlled runs, 14 Oct, one Spark, same servers and prompts. "Forced schema" te
 | Forced schema, Hermes fix, sampler fix | 8, 8, 8, 16 | 40/40 |
 | **Shipped setup** (all three fixes), plain | 8, 8, 8, 16, 4 | **44/44** |
 | **Shipped setup**, forced schema | 2 × 8 | **16/16** |
+| **Fresh clone of this repo, README steps** (4, 8, forced-schema 8) | 4, 8, 8 | **20/20** |
 
 In the shipped-setup runs every subagent computed its sum with a tool, and the true sum appears in its
-own terminal output (60/60). All subagents ran on MiniCPM and every parent turn on Qwen. The fan-out
+own terminal output (80/80). All subagents ran on MiniCPM and every parent turn on Qwen. The fan-out
 test fails on any wrong subagent answer, not just a wrong final summary.
 
 Subagents are still a smaller model: give them precise tasks and check what matters.
@@ -202,7 +203,7 @@ bash tests/run_all.sh tools hermes         # a subset
 | `hermes` | Real Hermes one-shot runs: Qwen fans 4 and 8 tasks out to MiniCPM, plus an 8-task run with a forced `output_schema`; every subagent's own answer and Qwen's summary are checked against ground truth, and requests are counted per server |
 | `longctx` | Cold 128K on each model with the other loaded, then 64K on both at once, with planted needles (generated from the local CPython stdlib) |
 
-The `hermes` test needs Hermes Agent installed (`hermes` on PATH), `hermes/patch_hermes.sh` and
+The `hermes` test needs Hermes Agent installed (`hermes` on PATH or in `~/.local/bin`), `hermes/patch_hermes.sh` and
 `hermes/install.sh` run first. Offline checks (no GPU): `python3 -m unittest discover -s tests -p "test_*.py"`.
 
 ## How these numbers were measured

@@ -295,6 +295,17 @@
     ],
     "child_correct": "16/16",
     "true_sum_in_child_tool_output": "16/16"
+   },
+   {
+    "setup": "shipped: fresh clone of the published repo following the README (setup, up, patch_hermes, install, run_all tools+hermes)",
+    "fanouts": [
+     4,
+     8,
+     8
+    ],
+    "child_correct": "20/20",
+    "true_sum_in_child_tool_output": "20/20",
+    "notes": "tools 7/7 both models; PATCH_EXIT 0; 0 Qwen template errors; all 20 subagent sessions on MiniCPM"
    }
   ],
   "hermes": "d97007c3 (v0.22.0) + NousResearch/hermes-agent#135354 where stated",
