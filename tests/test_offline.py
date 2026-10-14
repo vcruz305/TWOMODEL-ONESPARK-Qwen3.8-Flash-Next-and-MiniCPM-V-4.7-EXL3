@@ -22,6 +22,14 @@ class Shell(unittest.TestCase):
         t = (ROOT / "bin/up.sh").read_text()
         self.assertNotRegex(t, r"\(\s*cd [^)]*&\s*echo \$!", "server must be backgrounded in up.sh's own shell")
         self.assertEqual(t.count("setsid nohup"), 3)
+    def test_mini_key_safe_under_set_e(self):
+        # bin/up.sh polls mini_key under "set -e" before MiniCPM has written its key file.
+        r = subprocess.run(["bash", "-c", f'set -euo pipefail; source {ROOT/"bin/env.sh"}; MINI_STATE=/nonexistent; K="$(mini_key)"; echo "reached[$K]"'],
+                           capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "reached[]"))
+    def test_run_all_preflight_and_exports(self):
+        t = (ROOT / "tests/run_all.sh").read_text()
+        self.assertRegex(t, r"export [^\n]*MINI_STATE"); self.assertIn("servers not ready", t); self.assertIn("exit $rc", t)
     def test_defaults(self):
         batch, ngram, cache, seq, qp, mp = env_defaults()
         self.assertEqual((ngram, qp, mp), ("false", "8899", "8898"))

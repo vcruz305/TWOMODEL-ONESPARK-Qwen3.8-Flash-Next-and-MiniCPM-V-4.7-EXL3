@@ -4,7 +4,7 @@ Cases: single required call, auto with zero calls, parallel calls, tool-result r
 import json, sys, time, urllib.request
 import os
 QPORT = int(os.environ.get("QWEN_PORT", "8899")); MPORT = int(os.environ.get("MINI_PORT", "8898"))
-KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")) + "/api_tokens.yml"))["api_key"]
+KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.join(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")), "api_tokens.yml")))["api_key"]
 EP = {"qwen": (f"http://127.0.0.1:{QPORT}/v1", None, "Qwen3.8-Flash-Next-EXL3"),
       "mini": (f"http://127.0.0.1:{MPORT}/v1", KEY, "MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw")}
 TOOLS = [

@@ -32,7 +32,9 @@ PROFILE=long MAX_BATCH_SIZE="$MINI_MAX_BATCH" CACHE_SIZE="$MINI_CACHE_SIZE" MAX_
 echo $! > "$LOG_DIR/minicpm.pid"
 cd - >/dev/null
 sleep 3
-for _ in $(seq 1 60); do K="$(mini_key)"; [[ -n "$K" ]] && break; sleep 2; done
+K=""
+for _ in $(seq 1 90); do K="$(mini_key)"; [[ -n "$K" ]] && break; sleep 2; done
+[[ -n "$K" ]] || { tail -40 "$LOG_DIR/minicpm.log" >&2; die "MiniCPM never wrote its API key to $MINI_STATE/api_tokens.yml"; }
 wait_up minicpm "http://127.0.0.1:$MINI_PORT/v1/models" "Authorization: Bearer $(mini_key)"
 say "MiniCPM ready; MemAvailable $(mem_avail_mib) MiB"
 

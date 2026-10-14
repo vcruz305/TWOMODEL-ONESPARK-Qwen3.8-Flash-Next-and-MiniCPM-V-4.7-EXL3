@@ -6,7 +6,7 @@ MemAvailable minimum. Usage: conc_sweep.py OUT.json N1,N2,...  [--no-qwen]"""
 import json, sys, time, threading, urllib.request, statistics as st, random, re
 import os
 QPORT = int(os.environ.get("QWEN_PORT", "8899")); MPORT = int(os.environ.get("MINI_PORT", "8898"))
-KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")) + "/api_tokens.yml"))["api_key"]
+KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.join(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")), "api_tokens.yml")))["api_key"]
 OUT, NS = sys.argv[1], [int(x) for x in sys.argv[2].split(",")]
 WITH_QWEN = "--no-qwen" not in sys.argv
 TOOLS = [{"type": "function", "function": {"name": n, "description": d, "parameters": {"type": "object",

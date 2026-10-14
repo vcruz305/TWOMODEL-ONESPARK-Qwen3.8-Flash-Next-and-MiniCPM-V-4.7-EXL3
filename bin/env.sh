@@ -38,4 +38,6 @@ MEM_FLOOR_MIB="${MEM_FLOOR_MIB:-6144}"
 say() { printf '==> %s\n' "$*" >&2; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 mem_avail_mib() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
-mini_key() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['api_key'])" "$MINI_STATE/api_tokens.yml" 2>/dev/null; }
+# Prints the MiniCPM API key, or nothing if the server has not written it yet. Always returns 0 so
+# callers running under "set -e" can poll it while the server starts.
+mini_key() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['api_key'])" "$MINI_STATE/api_tokens.yml" 2>/dev/null || true; }

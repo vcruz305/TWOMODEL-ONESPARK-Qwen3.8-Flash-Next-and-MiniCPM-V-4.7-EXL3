@@ -5,7 +5,7 @@ import json, sys, time, threading, urllib.request, statistics as st
 PORT = int(sys.argv[1]); NS = [int(x) for x in sys.argv[2].split(",")]; LABEL = sys.argv[3] if len(sys.argv) > 3 else ""
 import os
 QPORT = int(os.environ.get("QWEN_PORT", "8899")); MPORT = int(os.environ.get("MINI_PORT", "8898"))
-KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")) + "/api_tokens.yml"))["api_key"]
+KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.join(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")), "api_tokens.yml")))["api_key"]
 IS_MINI = PORT == MPORT
 KEY = KEY if IS_MINI else None
 MODEL = "MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw" if IS_MINI else "Qwen3.8-Flash-Next-EXL3"

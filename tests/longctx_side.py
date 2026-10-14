@@ -8,7 +8,7 @@ import json, os, re, sys, time, threading, urllib.request
 import glob, random, sysconfig
 import os
 QPORT = int(os.environ.get("QWEN_PORT", "8899")); MPORT = int(os.environ.get("MINI_PORT", "8898"))
-KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")) + "/api_tokens.yml"))["api_key"]
+KEY = os.environ.get("MINI_KEY") or __import__("json").load(open(os.path.join(os.path.expanduser(os.environ.get("MINI_STATE", "~/twomodel-onespark/minicpm-state")), "api_tokens.yml")))["api_key"]
 NG = os.path.join(os.path.expanduser(os.environ.get("QWEN_MODEL_DIR", "~/models/Qwen3.8-Flash-Next-EXL3")), "ngram_embedding.safetensors")
 def build_doc(target_chars=1_000_000, seed=7):
     """Deterministic long document: CPython stdlib sources with four vault codes at 10/35/60/90% depth."""
