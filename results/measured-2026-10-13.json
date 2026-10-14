@@ -1,0 +1,184 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-13/14",
+ "hardware": "one NVIDIA DGX Spark (GB10, 128 GB unified memory)",
+ "engine": "ExLlamaV3 (vcruz305/exllamav3) via TabbyAPI (vcruz305/tabbyAPI), one server per model",
+ "runtime_commits_measured": {
+  "minicpm_exllamav3": "475461e9a1a288e7c10eb472056239d3fb78b625",
+  "minicpm_tabbyapi": "880e6b8bbdeda83090eb6cb5eabdbf8623fc4426",
+  "qwen_exllamav3_side_by_side_runs": "24f0dece34f09c8d1e2359d6b3b3f7befef7331b (previous recipe pin)",
+  "qwen_exllamav3_latest_master_ab": "475461e9a1a288e7c10eb472056239d3fb78b625",
+  "hermes_agent": "d97007c3 (v0.22.0)"
+ },
+ "packs": {
+  "qwen": "turboderp/Qwen3.8-Flash-Next-exl3 3.05bpw_h5_ng5 (31.1 GB n-gram table streamed from NVMe)",
+  "minicpm": "vcruz305/MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw"
+ },
+ "memory": {
+  "qwen_device_mib": 55724,
+  "minicpm_device_mib_batch32_cache1M": 25987,
+  "minicpm_device_mib_batch1_cache262k": 18033,
+  "min_memavailable_mib_both_loaded_short_runs": 39238,
+  "min_memavailable_mib_minicpm_batch32_cache1M_under_load": 22443,
+  "swap_used_max_mib": 116
+ },
+ "single_stream_400tok": {
+  "minicpm_alone": {
+   "code": 69.99,
+   "prose": 69.89
+  },
+  "minicpm_qwen_idle": {
+   "code": 69.82,
+   "prose": 69.84
+  },
+  "qwen_alone": {
+   "code": 87.48,
+   "prose": 56.65
+  },
+  "qwen_minicpm_idle": {
+   "code": 88.64,
+   "prose": 55.94
+  },
+  "qwen_ngram_cold_minicpm_idle": {
+   "code": 83.76,
+   "prose": 52.96
+  },
+  "both_generating": {
+   "minicpm": {
+    "code": 40.01,
+    "prose": 38.12
+   },
+   "qwen": {
+    "code": 35.28,
+    "prose": 28.74
+   }
+  }
+ },
+ "qwen_runtime_ab": {
+  "pinned_24f0dece3": {
+   "code": 89.04,
+   "prose": 55.48,
+   "math": 89.28
+  },
+  "master_475461e9": {
+   "code": 94.02,
+   "prose": 56.36,
+   "math": 93.76
+  },
+  "tools": "7/7 both",
+  "numerical_gate": "0 core failures, 4 investigate-only KL items (multilingual/tools p1023)"
+ },
+ "tools_conformance": {
+  "qwen": "7/7",
+  "minicpm": "7/7"
+ },
+ "minicpm_batched_decode_qwen_idle_short_prompts": {
+  "1": 69.7,
+  "4": 166.8,
+  "8": 217.3
+ },
+ "subagent_concurrency_7k_prompts_qwen_decoding": [
+  {
+   "n": 1,
+   "per_req": 34.98,
+   "aggregate": 18.2,
+   "ttft_p50": 7.94,
+   "qwen_main": 29.8
+  },
+  {
+   "n": 2,
+   "per_req": 27.36,
+   "aggregate": 21.9,
+   "ttft_p50": 16.46,
+   "qwen_main": 28.0
+  },
+  {
+   "n": 4,
+   "per_req": 18.25,
+   "aggregate": 24.6,
+   "ttft_p50": 33.02,
+   "qwen_main": 27.7
+  },
+  {
+   "n": 8,
+   "per_req": 9.16,
+   "aggregate": 25.8,
+   "ttft_p50": 63.93,
+   "qwen_main": 26.2
+  },
+  {
+   "n": 12,
+   "per_req": 2.45,
+   "aggregate": 18.6,
+   "ttft_p50": 68.35,
+   "qwen_main": 31.5
+  }
+ ],
+ "hermes_fanout": [
+  {
+   "subagents": 4,
+   "correct": "4/4",
+   "wall_s": 91.6,
+   "slowest_child_s": 55.39
+  },
+  {
+   "subagents": 8,
+   "correct": "8/8",
+   "wall_s": 122.8,
+   "slowest_child_s": 94.84
+  },
+  {
+   "subagents": 12,
+   "correct": "12/12",
+   "wall_s": 218.0,
+   "slowest_child_s": 185.41
+  },
+  {
+   "subagents": 16,
+   "correct": "16/16",
+   "wall_s": 320.8,
+   "slowest_child_s": 280.44
+  }
+ ],
+ "hermes_routing_check": {
+  "subagent_sessions_on_minicpm": 44,
+  "parent_sessions_on_qwen": 5,
+  "cross_routed": 0
+ },
+ "long_context_cold": [
+  {
+   "run": "qwen 128K, n-gram evicted, MiniCPM loaded",
+   "prompt_tokens": 128578,
+   "ttft_s": 206.3,
+   "prefill_tps": 625.01,
+   "decode_tps": 90.08,
+   "needles": "2/2",
+   "nvme_read_gb": 3.0
+  },
+  {
+   "run": "minicpm 128K, Qwen loaded",
+   "prompt_tokens": 128578,
+   "ttft_s": 90.1,
+   "prefill_tps": 1442.27,
+   "decode_tps": 54.61,
+   "needles": "2/2"
+  },
+  {
+   "run": "both 64K at once: minicpm",
+   "prompt_tokens": 63951,
+   "ttft_s": 83.5,
+   "prefill_tps": 769.29,
+   "decode_tps": 26.38,
+   "needles": "1/1"
+  },
+  {
+   "run": "both 64K at once: qwen",
+   "prompt_tokens": 63951,
+   "ttft_s": 148.1,
+   "prefill_tps": 432.89,
+   "decode_tps": 74.3,
+   "needles": "1/1",
+   "nvme_read_gb": 1.9
+  }
+ ]
+}

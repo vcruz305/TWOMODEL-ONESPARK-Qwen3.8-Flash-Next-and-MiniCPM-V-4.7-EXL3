@@ -1,0 +1,33 @@
+# Hermes Agent: Qwen3.8-Flash-Next is the main agent, MiniCPM-V 4.7 runs every delegate_task subagent.
+# Both are local TabbyAPI servers started by bin/up.sh. Copy into a Hermes profile with hermes/install.sh.
+# Keys/settings follow the Hermes docs: Configuration > Delegation, Providers > Named Custom Providers.
+model:
+  provider: qwen-spark
+  default: Qwen3.8-Flash-Next-EXL3
+  context_length: 262144
+
+providers:
+  qwen-spark:
+    api: http://127.0.0.1:8899/v1
+    transport: chat_completions
+    default_model: Qwen3.8-Flash-Next-EXL3
+    models:
+      Qwen3.8-Flash-Next-EXL3:
+        context_length: 262144
+  minicpm-spark:
+    api: http://127.0.0.1:8898/v1
+    key_env: MINICPM_API_KEY          # written to the profile's .env by hermes/install.sh
+    transport: chat_completions
+    default_model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw
+    models:
+      MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw:
+        context_length: 131072        # 8 subagents x 128K = the 1,048,576-token MiniCPM KV pool
+
+delegation:
+  provider: minicpm-spark             # every subagent goes to MiniCPM
+  model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw
+  max_concurrent_children: 8          # = MINI_MAX_BATCH; extra delegated tasks queue in Hermes
+  oneshot_max_children: 0             # default 2 caps one-shot runs; 0 = unlimited
+  max_iterations: 60
+  compression_threshold_tokens: 65536 # keep subagent prompts short so batched prefill stays fast
+  child_timeout_seconds: 3600
