@@ -94,6 +94,11 @@ class Hermes(unittest.TestCase):
         c = self.cfg(); batch, _, cache, *_ = env_defaults()
         ctx = c["providers"]["minicpm-spark"]["models"]["MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw"]["context_length"]
         self.assertLessEqual(ctx * int(batch), int(cache))
+    def test_titles_avoid_qwen_template(self):
+        self.assertEqual(self.cfg()["auxiliary"]["title_generation"]["provider"], "minicpm-spark")
+    def test_fanout_fails_on_wrong_answer(self):
+        t = (ROOT / "tests/hermes_fanout.sh").read_text()
+        self.assertIn("sys.exit(0 if ok else 1)", t); self.assertIn("exit $bad", t)
     def test_key_not_inline(self):
         self.assertNotIn("api_key", (ROOT / "hermes/config.yaml").read_text())
 
@@ -101,7 +106,8 @@ class Results(unittest.TestCase):
     def test_readme_numbers_come_from_results(self):
         r = json.loads((ROOT / "results/measured-2026-10-13.json").read_text())
         t = (ROOT / "README.md").read_text()
-        self.assertEqual(len(r["hermes_fanout"]), 4); self.assertTrue(all(x["correct"].split("/")[0] == x["correct"].split("/")[1] for x in r["hermes_fanout"]))
+        ok = sum(int(x["correct"].split("/")[0]) for x in r["hermes_fanout"]); n = sum(int(x["correct"].split("/")[1]) for x in r["hermes_fanout"])
+        self.assertEqual(f"{ok}/{n}", r["hermes_fanout_total_correct"]); self.assertIn(f"{ok}/{n} subagents", t)
         for v in ("16/16", "206 s", "1,442", "25.8", "22.4 GB", "94.0"): self.assertIn(v, t)
         self.assertEqual(r["hermes_routing_check"]["cross_routed"], 0)
 

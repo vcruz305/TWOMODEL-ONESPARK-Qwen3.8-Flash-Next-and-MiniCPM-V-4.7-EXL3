@@ -138,6 +138,36 @@
    "correct": "16/16",
    "wall_s": 320.8,
    "slowest_child_s": 280.44
+  },
+  {
+   "subagents": 4,
+   "correct": "3/4",
+   "wall_s": 104.3,
+   "slowest_child_s": 38.1,
+   "run": "fresh clone 40995ba, 2026-10-14",
+   "note": "d1.txt answered 1895, truth 1950: MiniCPM mental-arithmetic error after a correct read_file"
+  },
+  {
+   "subagents": 8,
+   "correct": "8/8",
+   "wall_s": 104.5,
+   "slowest_child_s": 74.62,
+   "run": "fresh clone 40995ba, 2026-10-14"
+  },
+  {
+   "subagents": 4,
+   "correct": "4/4",
+   "wall_s": 69.6,
+   "slowest_child_s": 39.93,
+   "run": "live check, title routing to MiniCPM, 2026-10-14"
+  },
+  {
+   "subagents": 8,
+   "correct": "5/8",
+   "wall_s": 191.4,
+   "slowest_child_s": 154.81,
+   "run": "live check, title routing to MiniCPM, 2026-10-14",
+   "note": "Qwen attached output_schema {sum:number}; 3 children computed correct sums (3114, 3183, 3364) via terminal, answered in prose, and the single output-contract retry turn produced 0, 1950 (sibling sum.json) and 26337 (all files summed)"
   }
  ],
  "hermes_routing_check": {
@@ -180,5 +210,11 @@
    "needles": "1/1",
    "nvme_read_gb": 1.9
   }
- ]
+ ],
+ "hermes_fanout_total_correct": "60/64",
+ "hermes_title_generation": {
+  "routed_to": "minicpm-spark",
+  "qwen_template_errors": 0,
+  "example_title": "Multiply 17 by 23"
+ }
 }

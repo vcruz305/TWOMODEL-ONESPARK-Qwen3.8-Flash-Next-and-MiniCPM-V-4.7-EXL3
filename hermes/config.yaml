@@ -23,6 +23,14 @@ providers:
       MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw:
         context_length: 131072        # 8 subagents x 128K = the 1,048,576-token MiniCPM KV pool
 
+auxiliary:
+  # Session titles go to MiniCPM. Hermes turns thinking off for title calls, and Qwen3.8-Flash-Next's chat
+  # template rejects that ("Unexpected reasoning effort none"); MiniCPM's template accepts it, and the
+  # small title request then stays off the single Qwen slot.
+  title_generation:
+    provider: minicpm-spark
+    model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw
+
 delegation:
   provider: minicpm-spark             # every subagent goes to MiniCPM
   model: MiniCPM-V-4.7-35B-A3B-EXL3-SAGE-3.74bpw

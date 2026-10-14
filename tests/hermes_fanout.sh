@@ -9,6 +9,7 @@ HERMES_BIN="${HERMES_BIN:-$(command -v hermes)}"
 MAXN=0; for n in "$@"; do [ $n -gt $MAXN ] && MAXN=$n; done
 grep -n "max_concurrent_children" $HERMES_HOME/config.yaml >&2
 R="${OUT_DIR:-$LOG_DIR}/hermes-fanout-$(date +%H%M%S)"; mkdir -p "$R"; echo "OUT $R" >&2
+bad=0
 for N in "$@"; do
   W=$R/n$N; mkdir -p $W; cd $W
   files=""; for i in $(seq 1 $N); do
@@ -31,6 +32,13 @@ print(json.dumps({"n": N, "rc": rc, "wall_s": round(t1 - t0, 1), "correct": sum(
                   "children_ok": len(child_s), "children_failed": fails,
                   "child_s_max": max(child_s) if child_s else None, "child_s_median": sorted(child_s)[len(child_s)//2] if child_s else None,
                   "qwen_requests": qreq, "minicpm_requests": mreq}))
+for k, v in truth.items():
+    if got.get(k) != v:
+        print(f"WRONG {k}: subagent answered {got.get(k)}, correct sum is {v}", file=sys.stderr)
+ok = rc == 0 and all(got.get(k) == v for k, v in truth.items()) and qreq > 0 and mreq > 0
+sys.exit(0 if ok else 1)
 EOF
+  [[ ${PIPESTATUS[0]} == 0 ]] || bad=1
 done
 echo FANOUT_DONE >&2
+exit $bad

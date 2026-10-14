@@ -15,7 +15,7 @@ Includes a tested [Hermes Agent](https://github.com/NousResearch/hermes-agent) c
 | Cold 128K prompt, other model loaded | 206 s to first token, 90 tok/s decode | 90 s, 55 tok/s |
 | Needle retrieval at 128K | 2/2 | 2/2 |
 | Tool calling (14 checks each) | 7/7 · 7/7 stream | 7/7 · 7/7 stream |
-| Hermes fan-out, all answers correct | — | 16/16 subagents |
+| Hermes fan-out answers correct (all runs) | — | 60/64 subagents |
 
 ## Models
 
@@ -116,6 +116,25 @@ servers' request logs agreed.
 | 8 | 8/8 | 123 s | 95 s |
 | 12 | 12/12 | 218 s | 185 s |
 | 16 | 16/16 | 321 s | 280 s |
+| 4 (fresh-clone run, 14 Oct) | 3/4 | 104 s | 38 s |
+| 8 (fresh-clone run, 14 Oct) | 8/8 | 105 s | 75 s |
+| 4 (live check, 14 Oct) | 4/4 | 70 s | 40 s |
+| 8 (live check, 14 Oct) | **5/8** | 191 s | 155 s |
+
+All 64 subagents ran on MiniCPM and every parent turn on Qwen; the 4 misses were answer errors, not
+routing or tool failures. Reading each failed subagent's Hermes session:
+
+- **Mental arithmetic (1 miss):** read the file correctly, then summed 61 numbers in its head (1,895 vs 1,950).
+- **Structured-output retry (3 misses, same 8-way run):** Qwen attached an `output_schema` (`{"sum": number}`)
+  to every task. These subagents computed the right sum with the terminal tool (3,114, 3,183, 3,364) but
+  answered in prose first. Hermes's single correction turn then made them start over: one replied
+  `{"sum": 0}`, and two re-read the shared folder, picked up a sibling's `sum.json` or summed all eight
+  files, and returned 1,950 and 26,337.
+
+**Treat MiniCPM subagent answers that must be exact as unverified.** In practice: give each subagent
+its own working directory, ask it to compute with the terminal tool, and check its numbers in the
+parent. The fan-out test fails on any wrong answer, so these numbers are what you should expect, not
+best cases.
 
 **Agent-sized prompts** (7.2K-token context with tool schemas, 300 tokens out) while Qwen keeps decoding:
 
